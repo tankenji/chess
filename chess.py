@@ -86,3 +86,6 @@ class ChessBoard:
                         if piece and piece.get_color() == self.color:
                             owned_pieces[piece] = (row, col)
                 return owned_pieces
+
+
+
