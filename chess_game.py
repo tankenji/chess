@@ -119,6 +119,7 @@ while running:
             if selected_piece is None:
                 # First click: select a piece if it's at the clicked position
                 piece = chessboard.get_piece(clicked_row, clicked_col)
+                
                 if piece is not None:
                     selected_piece = str(piece)
                     selected_position = (clicked_row, clicked_col)
