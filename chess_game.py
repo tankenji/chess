@@ -15,34 +15,6 @@ pygame.display.set_caption('Two-click Chess Movement')
 board = pygame.image.load('pngs/rect-8x8.png')
 board = pygame.transform.scale(board, (board_size, board_size))
 
-# # White chess pieces
-# white_rook = pygame.image.load('pngs/white-rook.png')
-# white_rook = pygame.transform.scale(white_rook, (square_size, square_size))
-# white_king = pygame.image.load('pngs/white-king.png')
-# white_king = pygame.transform.scale(white_king, (square_size, square_size))
-# white_queen = pygame.image.load('pngs/white-queen.png')
-# white_queen = pygame.transform.scale(white_queen, (square_size, square_size))
-# white_bishop = pygame.image.load('pngs/white-bishop.png')
-# white_bishop = pygame.transform.scale(white_bishop, (square_size, square_size))
-# white_knight = pygame.image.load('pngs/white-knight.png')
-# white_knight = pygame.transform.scale(white_knight, (square_size, square_size))
-# white_pawn = pygame.image.load('pngs/white-pawn.png')
-# white_pawn = pygame.transform.scale(white_pawn, (square_size, square_size))
-
-# # Black chess pieces
-# black_rook = pygame.image.load('pngs/black-rook.png')
-# black_rook = pygame.transform.scale(black_rook, (square_size, square_size))
-# black_king = pygame.image.load('pngs/black-king.png')
-# black_king = pygame.transform.scale(black_king, (square_size, square_size))
-# black_queen = pygame.image.load('pngs/black-queen.png')
-# black_queen = pygame.transform.scale(black_queen, (square_size, square_size))
-# black_bishop = pygame.image.load('pngs/black-bishop.png')
-# black_bishop = pygame.transform.scale(black_bishop, (square_size, square_size))
-# black_knight = pygame.image.load('pngs/black-knight.png')
-# black_knight = pygame.transform.scale(black_knight, (square_size, square_size))
-# black_pawn = pygame.image.load('pngs/black-pawn.png')
-# black_pawn = pygame.transform.scale(black_pawn, (square_size, square_size))
-
 # Initial positions (0-based indices for rows and columns)
 rook_position = (1, 0)
 
@@ -103,9 +75,10 @@ selected_piece = None
 selected_position = None
 
 # Main loop
+fen_string = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
 chessboard = chess.ChessBoard()
-chessboard.place_pieces_from_fen('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1')
-draw_pieces(chessboard.get_fen_string())
+chessboard.process_fen_string(fen_string)
+draw_pieces(chessboard.get_board_fen_string())
 running = True
 while running:
     for event in pygame.event.get():
@@ -119,14 +92,14 @@ while running:
             if selected_piece is None:
                 # First click: select a piece if it's at the clicked position
                 piece = chessboard.get_piece(clicked_row, clicked_col)
-                
+
                 if piece is not None:
                     selected_piece = str(piece)
                     selected_position = (clicked_row, clicked_col)
             else:
                 # Second click: move the piece to the clicked position
                 chessboard.move_piece(selected_position[0], selected_position[1], clicked_row, clicked_col)
-                draw_pieces(chessboard.get_fen_string())
+                draw_pieces(chessboard.get_board_fen_string())
                 selected_piece = None
                 selected_position = None
                 pygame.display.flip()

@@ -8,80 +8,56 @@ class ChessPiece:
         self.color = color
         self.row = row
         self.col = col
+        self.available_moves = None
         
     def get_color(self) -> str:
         return self.color
     
     def get_position(self) -> Tuple[int, int]:
-        return self.row, self.col        
+        return self.row, self.col
+    
+    def update_position(self, new_row: int, new_col: int) -> None:
+        self.row = new_row
+        self.col = new_col
+        return
+
+    def set_available_moves(self, moves: List[Tuple[int, int]]) -> None:
+        self.available_moves = moves
+
+    def get_available_moves(self) -> List[Tuple[int, int]]:
+        return self.available_moves        
     
 class King(ChessPiece):
-    def __init__(self, color: str, row: int, col: int):
-        super().__init__(color, row, col)
-
-    def get_color(self) -> str:
-        return super().get_color()
-
     def __str__(self) -> str:
         if self.color == WHITE:
             return 'K'
         return 'k'
 
 class Queen(ChessPiece):
-    def __init__(self, color: str, row: int, col: int):
-        super().__init__(color, row, col)
-
-    def get_color(self) -> str:
-        return super().get_color()
-    
     def __str__(self) -> str:
         if self.color == WHITE:
             return 'Q'
         return 'q'
 
 class Rook(ChessPiece):
-    def __init__(self, color: str, row: int, col: int):
-        super().__init__(color, row, col)
-
-    def get_color(self) -> str:
-        return super().get_color()
-
     def __str__(self) -> str:
         if self.color == WHITE:
             return 'R'
         return 'r'
 
 class Bishop(ChessPiece):
-    def __init__(self, color: str, row: int, col: int):
-        super().__init__(color, row, col)
-
-    def get_color(self) -> str:
-        return super().get_color()
-
     def __str__(self) -> str:
         if self.color == WHITE:
             return 'B'
         return 'b'
 
 class Knight(ChessPiece):
-    def __init__(self, color: str, row: int, col: int):
-        super().__init__(color, row, col)
-
-    def get_color(self) -> str:
-        return super().get_color()
-    
     def __str__(self) -> str:
         if self.color == WHITE:
             return 'N'
         return 'n'
 
 class Pawn(ChessPiece):
-    def __init__(self, color: str, row: int, col: int):
-        super().__init__(color, row, col)
-
-    def get_color(self) -> str:
-        return super().get_color()
-    
     def __str__(self) -> str:
         if self.color == WHITE:
             return 'P'
@@ -96,43 +72,73 @@ class ChessBoard:
         self.halfmove_clock = 0
         self.fullmove_number = 0
 
-    def place_piece(self, piece: ChessPiece, row: int, col: int):
+    def _place_piece(self, piece: ChessPiece, row: int, col: int):
         self.board[row][col] = piece
+        piece.update_position(row, col)
 
-    def remove_piece(self, row: int, col: int):
+    def _remove_piece(self, piece: ChessPiece):
+        row, col = piece.get_position()
         self.board[row][col] = None
+        piece.update_position(-1, -1)
 
-    def get_piece(self, row, col) -> Optional[ChessPiece]:
+    def _get_piece(self, row, col) -> Optional[ChessPiece]:
         return self.board[row][col]
 
-    def get_active_color(self) -> str:
+    def _get_active_color(self) -> str:
         return self.active_color
 
-    def get_en_passant(self) -> Optional[Tuple[int, int]]:
+    def _get_en_passant(self) -> Optional[Tuple[int, int]]:
         return self.en_passant
 
-    def move_piece(self, start_row, start_col, end_row, end_col):
-        piece1 = self.get_piece(start_row, start_col)
-        if piece1 is not None and piece1.get_color() == self.active_color:
+    def _move_piece(self, start_row, start_col, end_row, end_col):
+        piece = self._get_piece(start_row, start_col)
+        self._remove_piece(piece)
+        self._place_piece(piece, end_row, end_col)
+
+    def handle_moves(self, start_row: int, start_col: int, end_row: int, end_col: int):
+        piece1 = self._get_piece(start_row, start_col)
+        if piece1 is not None and piece1.get_color() != self.active_color:
+            raise ValueError("Invalid move: Cannot move opponent's piece")
+        piece2 = self._get_piece(end_row, end_col)
+        if piece2 is not None and piece2.get_color() == self.active_color:
             raise ValueError("Invalid move: Cannot capture own piece")
-        piece2 = self.get_piece(end_row, end_col)
-        
+
         # Check if the move is a castle
-        castle_side = self.check_castle_side(piece1, piece2)
-        if castle_side is not None:
-            self.castle(castle_side)
+        castle_side = self._check_castle_side(piece1, piece2)
+        if castle_side is not None and self.castling is not None:
+            self._handle_castling(castle_side)
             return
 
         # Check if the move is an en passant
-        if isinstance(piece1, Pawn) and end_col == self.en_passant[1] and end_row == self.en_passant[0]:
-            self.board[start_row][end_col] = None
+        if isinstance(piece1, Pawn) and self.en_passant == (end_row, end_col):
+            pawn = None
+            if self.active_color == WHITE:
+                pawn = self._get_piece(end_row - 1, end_col)
+            else: # BLACK
+                pawn = self._get_piece(end_row + 1, end_col)
+            if pawn is not None and not isinstance(pawn, Pawn):
+                self._handle_en_passant(piece1, pawn)
+                return
 
         # Move the piece
-        self.remove_piece(start_row, start_col)
-        self.place_piece(piece1, end_row, end_col)
+        self._move_piece(start_row, start_col, end_row, end_col)
+        self._update_half_full_moves()
+
+    def _update_half_full_moves(self):
+        self.halfmove_clock += 1
+        if self.active_color == BLACK:
+            self.fullmove_number += 1
     
-    def check_castle_side(self, piece1: ChessPiece, piece2: ChessPiece) -> str:
-        active_color = self.get_active_color()
+    def _handle_en_passant(self, piece1: ChessPiece, piece2: ChessPiece):
+        row1, col1 = piece1.get_position() # starting pawn
+        row2, col2 = piece2.get_position()
+        if row1 == row2 and abs(col1 - col2) == 1:
+            self._move_piece(row1, col1, row2, col2)
+            self.en_passant = None
+            return
+
+    def _check_castle_side(self, piece1: ChessPiece, piece2: ChessPiece) -> str:
+        active_color = self._get_active_color()
         if not piece1.color == active_color or not piece2.color == active_color:
             return None
         if active_color == WHITE:
@@ -149,7 +155,7 @@ class ChessBoard:
                     return "queenside"
         return None
 
-    def castle(self, side: str):
+    def _handle_castling(self, side: str):
         if self.active_color == WHITE:
             king_row = 7
         else:
@@ -166,8 +172,8 @@ class ChessBoard:
         else:
             raise ValueError("Invalid castle side")
 
-        king = self.get_piece(king_row, 4)
-        rook = self.get_piece(king_row, rook_col)
+        king = self._get_piece(king_row, 4)
+        rook = self._get_piece(king_row, rook_col)
 
         if not isinstance(king, King) or not isinstance(rook, Rook):
             raise ValueError("Invalid castle move")
@@ -182,25 +188,30 @@ class ChessBoard:
         # TODO: Check if the king is in check, moves through check, or ends in check
         if rook_col == 7:
             for col in range(5, 7):
-                if self.get_piece(king_row, col) is not None:
+                if self._get_piece(king_row, col) is not None:
                     raise ValueError("Invalid castle move")
         else:
             for col in range(1, 4):
-                if self.get_piece(king_row, col) is not None:
+                if self._get_piece(king_row, col) is not None:
                     raise ValueError("Invalid castle move")
 
         # Update the board
-        self.move_piece(king_row, 4, king_row, new_king_col)
-        self.move_piece(king_row, rook_col, king_row, new_rook_col)
+        self._move_piece(king_row, 4, king_row, new_king_col)
+        self._move_piece(king_row, rook_col, king_row, new_rook_col)
 
         # Update the fen string
-        fen_parts = self.get_fen_string().split(" ")
-        fen_parts[0] = fen_parts[0][:king_row * 8 + 4] + fen_parts[0][king_row * 8 + new_king_col] + fen_parts[0][king_row * 8 + 4 + 1:]
-        fen_parts[0] = fen_parts[0][:king_row * 8 + rook_col] + fen_parts[0][king_row * 8 + new_rook_col] + fen_parts[0][king_row * 8 + rook_col + 1:]
-        fen_parts[2] = fen_parts[2].replace(self.active_color, "")
-        fen_parts[2] = fen_parts[2].replace("k", "") if side == "kingside" else fen_parts[2].replace("q", "")
-        fen_parts[2] = fen_parts[2] + self.active_color if side == "kingside" else self.active_color + fen_parts[2]
-        self.process_fen_string(" ".join(fen_parts))
+        if side == "kingside":
+            if self.active_color == WHITE:
+                self.castling = self.castling.replace("K", "")
+            else:  # BLACK
+                self.castling = self.castling.replace("k", "")
+        elif side == "queenside":
+            if self.active_color == WHITE:
+                self.castling = self.castling.replace("Q", "")
+            else:  # BLACK
+                self.castling = self.castling.replace("q", "")
+        if self.castling == "":
+            self.castling = None
 
     def _place_pieces_from_fen(self, fen: str):
         rows = fen.split('/')
@@ -243,12 +254,31 @@ class ChessBoard:
         self.halfmove_clock = int(fen_parts[4])
         self.fullmove_number = int(fen_parts[5])
 
+
+
     def get_fen_string(self) -> str:
+        fen = self._get_board_fen_string()
+        fen += f" {self._get_active_color()}"
+        if self.castling is None:
+            fen += " -"
+        else:
+            fen += f" {self.castling}"
+        if self.en_passant is None:
+            fen += " -"
+        else:
+            row = self.en_passant[0]
+            col = chr(self.en_passant[1] + ord('a'))
+            fen += f" {col}{row}"
+        fen += f" {self.halfmove_clock}"
+        fen += f" {self.fullmove_number}"
+        return fen
+
+    def _get_board_fen_string(self) -> str:
         fen = ""
         empty_count = 0
         for row in range(8):
             for col in range(8):
-                piece = self.get_piece(row, col)
+                piece = self._get_piece(row, col)
                 if piece:
                     if empty_count > 0:
                         fen += str(empty_count)
@@ -274,22 +304,22 @@ class ChessBoard:
                 fen += '/'
         return fen
 
-class Player:
-    def __init__(self, color: str, board: ChessBoard):
-        self.color = color
-        self.board = board
+# class Player:
+#     def __init__(self, color: str, board: ChessBoard):
+#         self.color = color
+#         self.board = board
     
-    def get_color(self) -> str:
-        return self.color
+#     def get_color(self) -> str:
+#         return self.color
     
-    def get_owned_pieces(self) -> Dict[ChessPiece, Tuple[int, int]]:
-            owned_pieces = {}
-            for row in range(8):
-                for col in range(8):
-                    piece = self.board.get_piece(row, col)
-                    if piece and piece.get_color() == self.color:
-                        owned_pieces[piece] = (row, col)
-            return owned_pieces
+#     def get_owned_pieces(self) -> Dict[ChessPiece, Tuple[int, int]]:
+#             owned_pieces = {}
+#             for row in range(8):
+#                 for col in range(8):
+#                     piece = self.board.get_piece(row, col)
+#                     if piece and piece.get_color() == self.color:
+#                         owned_pieces[piece] = (row, col)
+#             return owned_pieces
     
 
 
