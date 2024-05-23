@@ -1,6 +1,6 @@
 import pygame
 import sys
-import chess
+import chess_board
 
 # Initialize Pygame
 pygame.init()
@@ -76,12 +76,13 @@ selected_position = None
 
 # Main loop
 fen_string = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
-chessboard = chess.ChessBoard()
-chessboard.process_fen_string(fen_string)
-draw_pieces(chessboard.get_board_fen_string())
+chessboard = chess_board.ChessBoard()
 running = True
 while running:
     for event in pygame.event.get():
+        chessboard.process_fen_string(fen_string)
+        draw_pieces(fen_string)
+
         if event.type == pygame.QUIT:
             running = False
         elif event.type == pygame.MOUSEBUTTONDOWN:
@@ -94,12 +95,12 @@ while running:
                 piece = chessboard.get_piece(clicked_row, clicked_col)
 
                 if piece is not None:
-                    selected_piece = str(piece)
+                    selected_piece = piece
                     selected_position = (clicked_row, clicked_col)
             else:
                 # Second click: move the piece to the clicked position
-                chessboard.move_piece(selected_position[0], selected_position[1], clicked_row, clicked_col)
-                draw_pieces(chessboard.get_board_fen_string())
+                chessboard.handle_moves(selected_position[0], selected_position[1], clicked_row, clicked_col)
+                fen_string = chessboard.get_fen_string()
                 selected_piece = None
                 selected_position = None
                 pygame.display.flip()

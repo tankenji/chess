@@ -1,7 +1,7 @@
 from typing import Dict, List, Tuple, Optional
 
-WHITE = 'white'
-BLACK = 'black'
+WHITE = 'w'
+BLACK = 'b'
 
 class ChessPiece:
     def __init__(self, color: str, row: int, col: int):
@@ -21,47 +21,127 @@ class ChessPiece:
         self.col = new_col
         return
 
-    def set_available_moves(self, moves: List[Tuple[int, int]]) -> None:
-        self.available_moves = moves
-
     def get_available_moves(self) -> List[Tuple[int, int]]:
-        return self.available_moves        
+        return self.available_moves
+    
+    def calculate_available_moves(self, board):
+        """Calculate the available moves for this piece given the current state of the board."""
+        raise NotImplementedError("This method must be implemented in a subclass.")
     
 class King(ChessPiece):
-    def __str__(self) -> str:
-        if self.color == WHITE:
-            return 'K'
-        return 'k'
+    def calculate_available_moves(self, chessboard: 'ChessBoard'):
+        """Calculate the available moves for a King."""
+        moves = []
+        for dx, dy in [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)]:
+            new_row, new_col = self.row + dx, self.col + dy
+            if 0 <= new_row < 8 and 0 <= new_col < 8:  # Check that the move is on the board.
+                new_spot = chessboard.get_piece(new_row, new_col)
+                if new_spot is None or new_spot.color != self.color:  # Destination square is empty or contains an opponent's piece.
+                    moves.append((new_row, new_col))
+        self.available_moves = moves
 
 class Queen(ChessPiece):
-    def __str__(self) -> str:
-        if self.color == WHITE:
-            return 'Q'
-        return 'q'
+    def calculate_available_moves(self, chessboard: 'ChessBoard'):
+        """Calculate the available moves for a Queen."""
+        moves = []
+        directions = [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)]
+        for dx, dy in directions:
+            new_row, new_col = self.row + dx, self.col + dy
+            while 0 <= new_row < 8 and 0 <= new_col < 8:
+                new_spot = chessboard.get_piece(new_row, new_col)
+                if new_spot is None:
+                    moves.append((new_row, new_col))
+                elif new_spot.color != self.color:
+                    moves.append((new_row, new_col))
+                    break
+                else:
+                    break
+                new_row += dx
+                new_col += dy
+        self.available_moves = moves
+
 
 class Rook(ChessPiece):
-    def __str__(self) -> str:
-        if self.color == WHITE:
-            return 'R'
-        return 'r'
+    def calculate_available_moves(self, chessboard: 'ChessBoard'):
+        """Calculate the available moves for a Rook."""
+        moves = []
+        directions = [(0, -1), (0, 1), (-1, 0), (1, 0)]
+        for dx, dy in directions:
+            new_row, new_col = self.row + dx, self.col + dy
+            while 0 <= new_row < 8 and 0 <= new_col < 8:
+                piece = chessboard.get_piece(new_row, new_col)
+                if piece is None:
+                    moves.append((new_row, new_col))
+                elif piece.get_color() != self.color:
+                    moves.append((new_row, new_col))
+                    break
+                else:
+                    break
+                new_row += dx
+                new_col += dy
+        self.available_moves = moves
 
 class Bishop(ChessPiece):
-    def __str__(self) -> str:
-        if self.color == WHITE:
-            return 'B'
-        return 'b'
+    def calculate_available_moves(self, chessboard: 'ChessBoard'):
+        """Calculate the available moves for a Bishop."""
+        moves = []
+        directions = [(-1, -1), (-1, 1), (1, -1), (1, 1)]
+        for dx, dy in directions:
+            new_row, new_col = self.row + dx, self.col + dy
+            while 0 <= new_row < 8 and 0 <= new_col < 8:
+                piece = chessboard.get_piece(new_row, new_col)
+                if piece is None:
+                    moves.append((new_row, new_col))
+                elif piece.get_color() != self.color:
+                    moves.append((new_row, new_col))
+                    break
+                else:
+                    break
+                new_row += dx
+                new_col += dy
+        self.available_moves = moves
 
 class Knight(ChessPiece):
-    def __str__(self) -> str:
-        if self.color == WHITE:
-            return 'N'
-        return 'n'
+    def calculate_available_moves(self, chessboard: 'ChessBoard'):
+        """Calculate the available moves for a Knight."""
+        moves = []
+        directions = [(-2, -1), (-2, 1), (-1, -2), (-1, 2), (1, -2), (1, 2), (2, -1), (2, 1)]
+        for dx, dy in directions:
+            new_row, new_col = self.row + dx, self.col + dy
+            if 0 <= new_row < 8 and 0 <= new_col < 8 and (chessboard.get_piece(new_row, new_col) is None or chessboard.get_piece(new_row, new_col).color != self.color):
+                moves.append((new_row, new_col))
+        self.available_moves = moves
 
 class Pawn(ChessPiece):
-    def __str__(self) -> str:
-        if self.color == WHITE:
-            return 'P'
-        return 'p'
+    def calculate_available_moves(self, chessboard: 'ChessBoard'):
+        """Calculate the available moves for a Pawn."""
+        moves = []
+        row, col = self.get_position()
+        color = self.get_color()
+        # Determine the direction of movement based on the color of the pawn
+        if color == WHITE:
+            direction = -1
+        else:
+            direction = 1
+        # Check if the pawn can move forward one square
+        new_row = row + direction
+        if 0 <= new_row < 8 and chessboard.get_piece(new_row, col) is None:
+            moves.append((new_row, col))
+            # Check if the pawn is in its starting position and can move forward two squares
+            if (color == WHITE and row == 6) or (color == BLACK and row == 1):
+                new_row2 = row + 2 * direction
+                if chessboard.get_piece(new_row2, col) is None:
+                    moves.append((new_row2, col))
+        # Check if the pawn can capture diagonally
+        for dcol in [-1, 1]: # Check left and right
+            new_row = row + direction
+            new_col = col + dcol
+            if 0 <= new_row < 8 and 0 <= new_col < 8:
+                piece = chessboard.get_piece(new_row, new_col)
+                if piece is not None and piece.get_color() != color:
+                    moves.append((new_row, new_col))
+        self.available_moves = moves
+        
 
 class ChessBoard:
     def __init__(self):
@@ -81,7 +161,7 @@ class ChessBoard:
         self.board[row][col] = None
         piece.update_position(-1, -1)
 
-    def _get_piece(self, row, col) -> Optional[ChessPiece]:
+    def get_piece(self, row, col) -> Optional[ChessPiece]:
         return self.board[row][col]
 
     def _get_active_color(self) -> str:
@@ -91,20 +171,22 @@ class ChessBoard:
         return self.en_passant
 
     def _move_piece(self, start_row, start_col, end_row, end_col):
-        piece = self._get_piece(start_row, start_col)
+        piece = self.get_piece(start_row, start_col)
         self._remove_piece(piece)
         self._place_piece(piece, end_row, end_col)
 
     def handle_moves(self, start_row: int, start_col: int, end_row: int, end_col: int):
-        piece1 = self._get_piece(start_row, start_col)
+        piece1 = self.get_piece(start_row, start_col)
         if piece1 is not None and piece1.get_color() != self.active_color:
             raise ValueError("Invalid move: Cannot move opponent's piece")
-        piece2 = self._get_piece(end_row, end_col)
+        piece2 = self.get_piece(end_row, end_col)
         if piece2 is not None and piece2.get_color() == self.active_color:
             raise ValueError("Invalid move: Cannot capture own piece")
 
         # Check if the move is a castle
-        castle_side = self._check_castle_side(piece1, piece2)
+        castle_side = None
+        if isinstance(piece1, King) and isinstance(piece2, Rook):
+            castle_side = self._check_castle_side(piece1, piece2)
         if castle_side is not None and self.castling is not None:
             self._handle_castling(castle_side)
             return
@@ -113,16 +195,33 @@ class ChessBoard:
         if isinstance(piece1, Pawn) and self.en_passant == (end_row, end_col):
             pawn = None
             if self.active_color == WHITE:
-                pawn = self._get_piece(end_row - 1, end_col)
+                pawn = self.get_piece(end_row - 1, end_col)
             else: # BLACK
-                pawn = self._get_piece(end_row + 1, end_col)
+                pawn = self.get_piece(end_row + 1, end_col)
             if pawn is not None and not isinstance(pawn, Pawn):
                 self._handle_en_passant(piece1, pawn)
                 return
 
+        # Check if the move is a regular move
+        if (end_row, end_col) not in piece1.get_available_moves():
+            raise ValueError("Invalid move: Piece cannot move to that position")
+
         # Move the piece
         self._move_piece(start_row, start_col, end_row, end_col)
         self._update_half_full_moves()
+        self._update_active_color()
+        
+        # Check if the move is a pawn promotion
+        if isinstance(piece1, Pawn) and (end_row == 0 or end_row == 7):
+            self._remove_piece(piece1)
+            self._place_piece(Queen(self.active_color, end_row, end_col), end_row, end_col)
+
+
+    def _update_active_color(self):
+        if self.active_color == WHITE:
+            self.active_color = BLACK
+        else:
+            self.active_color = WHITE
 
     def _update_half_full_moves(self):
         self.halfmove_clock += 1
@@ -142,17 +241,15 @@ class ChessBoard:
         if not piece1.color == active_color or not piece2.color == active_color:
             return None
         if active_color == WHITE:
-            if isinstance(piece1, King) and isinstance(piece2, Rook):
-                if piece2.col > piece1.col and self.castling.find("K") != -1:
-                    return "kingside"
-                elif piece2.col < piece1.col and self.castling.find("Q") != -1:
-                    return "queenside"
+            if piece2.col > piece1.col and self.castling.find("K") != -1:
+                return "kingside"
+            elif piece2.col < piece1.col and self.castling.find("Q") != -1:
+                return "queenside"
         if active_color == BLACK:
-            if isinstance(piece1, King) and isinstance(piece2, Rook):
-                if piece2.col > piece1.col and self.castling.find("k") != -1:
-                    return "kingside"
-                elif piece2.col < piece1.col and self.castling.find("q") != -1:
-                    return "queenside"
+            if piece2.col > piece1.col and self.castling.find("k") != -1:
+                return "kingside"
+            elif piece2.col < piece1.col and self.castling.find("q") != -1:
+                return "queenside"
         return None
 
     def _handle_castling(self, side: str):
@@ -172,8 +269,8 @@ class ChessBoard:
         else:
             raise ValueError("Invalid castle side")
 
-        king = self._get_piece(king_row, 4)
-        rook = self._get_piece(king_row, rook_col)
+        king = self.get_piece(king_row, 4)
+        rook = self.get_piece(king_row, rook_col)
 
         if not isinstance(king, King) or not isinstance(rook, Rook):
             raise ValueError("Invalid castle move")
@@ -188,11 +285,11 @@ class ChessBoard:
         # TODO: Check if the king is in check, moves through check, or ends in check
         if rook_col == 7:
             for col in range(5, 7):
-                if self._get_piece(king_row, col) is not None:
+                if self.get_piece(king_row, col) is not None:
                     raise ValueError("Invalid castle move")
         else:
             for col in range(1, 4):
-                if self._get_piece(king_row, col) is not None:
+                if self.get_piece(king_row, col) is not None:
                     raise ValueError("Invalid castle move")
 
         # Update the board
@@ -239,7 +336,7 @@ class ChessBoard:
                         piece = Pawn(color, row, col)
                     else:
                         raise ValueError(f"Invalid FEN string: {fen}")
-                    self.place_piece(piece, row, col)
+                    self._place_piece(piece, row, col)
                     col += 1
 
     def process_fen_string(self, fen: str):
@@ -253,8 +350,14 @@ class ChessBoard:
         self.castling = fen_parts[2]
         self.halfmove_clock = int(fen_parts[4])
         self.fullmove_number = int(fen_parts[5])
+        self._calculate_all_available_moves()
 
-
+    def _calculate_all_available_moves(self):
+        for row in range(8):
+            for col in range(8):
+                piece = self.get_piece(row, col)
+                if piece is not None:
+                    piece.calculate_available_moves(self)
 
     def get_fen_string(self) -> str:
         fen = self._get_board_fen_string()
@@ -278,7 +381,7 @@ class ChessBoard:
         empty_count = 0
         for row in range(8):
             for col in range(8):
-                piece = self._get_piece(row, col)
+                piece = self.get_piece(row, col)
                 if piece:
                     if empty_count > 0:
                         fen += str(empty_count)
