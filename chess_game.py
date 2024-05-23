@@ -116,11 +116,6 @@ while running:
                 # First click: select a piece if it's at the clicked position
                 piece = chessboard.get_piece(clicked_row, clicked_col)
                 # print(f"Piece: {piece} at row: {clicked_row} and col: {clicked_col}")
-                if piece is not None and piece.color == chessboard.active_color:
-                    available_moves = piece.get_available_moves()
-                    print(f"Available moves: {available_moves}")
-                    place_green_squares(available_moves)
-                    pygame.display.flip()
 
                 if piece is not None:
                     selected_piece = piece
@@ -133,6 +128,12 @@ while running:
                 print(f"FEN String: {fen_string}")
                 selected_piece = None
                 selected_position = None
+                pygame.display.flip()
+
+            if piece is not None and piece.color == chessboard.active_color:
+                available_moves = piece.get_available_moves()
+                print(f"Available moves: {available_moves}")
+                place_green_squares(available_moves)
                 pygame.display.flip()
 
 pygame.quit()

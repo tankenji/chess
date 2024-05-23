@@ -8,7 +8,7 @@ class ChessPiece:
         self.color = color
         self.row = row
         self.col = col
-        self.available_moves = None
+        self.available_moves = []
         
     def get_color(self) -> str:
         return self.color
@@ -39,6 +39,12 @@ class King(ChessPiece):
                 if new_spot is None or new_spot.color != self.color:  # Destination square is empty or contains an opponent's piece.
                     moves.append((new_row, new_col))
         self.available_moves = moves
+        # Can only move to squares that are not under attack by opponent's pieces
+        for move in moves:
+            if move in chessboard.get_available_moves_for_black() and self.color == WHITE:
+                moves.remove(move)
+            elif move in chessboard.get_available_moves_for_white() and self.color == BLACK:
+                moves.remove(move)
 
 class Queen(ChessPiece):
     def calculate_available_moves(self, chessboard: 'ChessBoard'):
@@ -176,6 +182,15 @@ class ChessBoard:
         piece = self.get_piece(start_row, start_col)
         self._remove_piece(piece)
         self._place_piece(piece, end_row, end_col)
+
+    def _find_king_location(self) -> Optional[Tuple[int, int]]: # TODO: Optimize using FEN string
+        active_color = self._get_active_color()
+        for row in range(8):
+            for col in range(8):
+                piece = self.get_piece(row, col)
+                if isinstance(piece, King) and piece.get_color() == active_color:
+                    return row, col
+        return None
 
     def handle_moves(self, start_row: int, start_col: int, end_row: int, end_col: int):
         piece1 = self.get_piece(start_row, start_col)
@@ -371,6 +386,25 @@ class ChessBoard:
         self.halfmove_clock = int(fen_parts[4])
         self.fullmove_number = int(fen_parts[5])
         self._calculate_all_available_moves()
+        self._check_check()
+        
+    def _check_check(self):
+        # Handle a check for the validity of the move
+        king_location = self._find_king_location()
+        if self.active_color == WHITE and king_location is not None and king_location in self.get_available_moves_for_black():
+            # print("White king is in check")
+            for row in range(8):
+                for col in range(8):
+                    piece = self.get_piece(row, col)
+                    if piece is not None and not isinstance(piece, King) and piece.get_color() == WHITE:
+                        piece.available_moves = []
+        if self.active_color == BLACK and king_location is not None and king_location in self.get_available_moves_for_white():
+            print("Black king is in check")
+            for row in range(8):
+                for col in range(8):
+                    piece = self.get_piece(row, col)
+                    if piece is not None and not isinstance(piece, King) and piece.get_color() == BLACK:
+                        piece.available_moves = []
 
     def _calculate_all_available_moves(self):
         for row in range(8):
@@ -378,6 +412,28 @@ class ChessBoard:
                 piece = self.get_piece(row, col)
                 if piece is not None:
                     piece.calculate_available_moves(self)
+
+    def get_available_moves_for_black(self) -> List[Tuple[int, int]]:
+        available_moves = []
+        for row in range(8):
+            for col in range(8):
+                piece = self.get_piece(row, col)
+                if piece is not None and piece.get_color() == BLACK:
+                    moves = piece.get_available_moves()
+                    for move in moves:
+                        available_moves.append(move)
+        return available_moves
+    
+    def get_available_moves_for_white(self) -> List[Tuple[int, int]]:
+        available_moves = []
+        for row in range(8):
+            for col in range(8):
+                piece = self.get_piece(row, col)
+                if piece is not None and piece.get_color() == WHITE:
+                    moves = piece.get_available_moves()
+                    for move in moves:
+                        available_moves.append(move)
+        return available_moves
 
     def get_fen_string(self) -> str:
         fen = self._get_board_fen_string()
