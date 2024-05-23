@@ -140,6 +140,8 @@ class Pawn(ChessPiece):
                 piece = chessboard.get_piece(new_row, new_col)
                 if piece is not None and piece.get_color() != color:
                     moves.append((new_row, new_col))
+                if (new_row, new_col) == chessboard._get_en_passant():
+                    moves.append((new_row, new_col))
         self.available_moves = moves
         
 
@@ -178,10 +180,14 @@ class ChessBoard:
     def handle_moves(self, start_row: int, start_col: int, end_row: int, end_col: int):
         piece1 = self.get_piece(start_row, start_col)
         if piece1 is not None and piece1.get_color() != self.active_color:
-            raise ValueError("Invalid move: Cannot move opponent's piece")
+            print("Invalid move: Cannot move opponent's piece")
+            return
+            # raise ValueError("Invalid move: Cannot move opponent's piece")
         piece2 = self.get_piece(end_row, end_col)
         if piece2 is not None and piece2.get_color() == self.active_color:
-            raise ValueError("Invalid move: Cannot capture own piece")
+            print("Invalid move: Cannot capture own piece")
+            return
+            # raise ValueError("Invalid move: Cannot capture own piece")
 
         # Check if the move is a castle
         castle_side = None
@@ -189,33 +195,55 @@ class ChessBoard:
             castle_side = self._check_castle_side(piece1, piece2)
         if castle_side is not None and self.castling is not None:
             self._handle_castling(castle_side)
+            self.en_passant = None
+            self._update_half_full_moves()
+            self._update_active_color()
             return
 
         # Check if the move is an en passant
-        if isinstance(piece1, Pawn) and self.en_passant == (end_row, end_col):
+        if isinstance(piece1, Pawn) and self.en_passant == (end_row, end_col) and self.en_passant in piece1.get_available_moves():
+            print("ENTERED: en passant move")
+            self._move_piece(start_row, start_col, end_row, end_col)
             pawn = None
             if self.active_color == WHITE:
-                pawn = self.get_piece(end_row - 1, end_col)
-            else: # BLACK
-                pawn = self.get_piece(end_row + 1, end_col)
-            if pawn is not None and not isinstance(pawn, Pawn):
-                self._handle_en_passant(piece1, pawn)
-                return
+                pawn = self.get_piece(start_row, end_col)
+                self._remove_piece(pawn)
+            elif self.active_color == BLACK:
+                pawn = self.get_piece(start_row, end_col)
+                self._remove_piece(pawn)
+            self.en_passant = None
+            self._update_half_full_moves()
+            self._update_active_color()
+            return
 
         # Check if the move is a regular move
         if (end_row, end_col) not in piece1.get_available_moves():
-            raise ValueError("Invalid move: Piece cannot move to that position")
+            print("Invalid move: Piece cannot move to that position")
+            return
+            # raise ValueError("Invalid move: Piece cannot move to that position")
 
         # Move the piece
         self._move_piece(start_row, start_col, end_row, end_col)
-        self._update_half_full_moves()
-        self._update_active_color()
         
         # Check if the move is a pawn promotion
         if isinstance(piece1, Pawn) and (end_row == 0 or end_row == 7):
             self._remove_piece(piece1)
             self._place_piece(Queen(self.active_color, end_row, end_col), end_row, end_col)
 
+        # Check if move is a pawn double move
+        if isinstance(piece1, Pawn) and abs(start_row - end_row) == 2:
+            if self.active_color == WHITE:
+                self.en_passant = (end_row + 1, end_col)
+                print("white en passant set")
+            else:
+                self.en_passant = (end_row - 1, end_col)
+                print("black en passant set")
+            # self.en_passant = (end_row, end_col)
+        else:
+            self.en_passant = None
+        print("en passant after move at: " + str(self.en_passant))
+        self._update_half_full_moves()
+        self._update_active_color()
 
     def _update_active_color(self):
         if self.active_color == WHITE:
@@ -227,14 +255,6 @@ class ChessBoard:
         self.halfmove_clock += 1
         if self.active_color == BLACK:
             self.fullmove_number += 1
-    
-    def _handle_en_passant(self, piece1: ChessPiece, piece2: ChessPiece):
-        row1, col1 = piece1.get_position() # starting pawn
-        row2, col2 = piece2.get_position()
-        if row1 == row2 and abs(col1 - col2) == 1:
-            self._move_piece(row1, col1, row2, col2)
-            self.en_passant = None
-            return
 
     def _check_castle_side(self, piece1: ChessPiece, piece2: ChessPiece) -> str:
         active_color = self._get_active_color()
@@ -346,7 +366,7 @@ class ChessBoard:
         if fen_parts[3] == '-':
             self.en_passant = None
         else:
-            self.en_passant = (int(fen_parts[3][1]), ord(fen_parts[3][0]) - ord('a'))
+            self.en_passant = (8 - int(fen_parts[3][1])), ord(fen_parts[3][0]) - ord('a')
         self.castling = fen_parts[2]
         self.halfmove_clock = int(fen_parts[4])
         self.fullmove_number = int(fen_parts[5])
@@ -369,7 +389,8 @@ class ChessBoard:
         if self.en_passant is None:
             fen += " -"
         else:
-            row = self.en_passant[0]
+            print(f"en passant when updating fen: {self.en_passant}")
+            row = 8 - self.en_passant[0]
             col = chr(self.en_passant[1] + ord('a'))
             fen += f" {col}{row}"
         fen += f" {self.halfmove_clock}"
@@ -406,24 +427,3 @@ class ChessBoard:
             if row < 7:
                 fen += '/'
         return fen
-
-# class Player:
-#     def __init__(self, color: str, board: ChessBoard):
-#         self.color = color
-#         self.board = board
-    
-#     def get_color(self) -> str:
-#         return self.color
-    
-#     def get_owned_pieces(self) -> Dict[ChessPiece, Tuple[int, int]]:
-#             owned_pieces = {}
-#             for row in range(8):
-#                 for col in range(8):
-#                     piece = self.board.get_piece(row, col)
-#                     if piece and piece.get_color() == self.color:
-#                         owned_pieces[piece] = (row, col)
-#             return owned_pieces
-    
-
-
-# rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR
