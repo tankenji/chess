@@ -1,3 +1,4 @@
+import copy
 from typing import Dict, List, Tuple, Optional
 
 WHITE = 'w'
@@ -28,6 +29,8 @@ class ChessPiece:
         """Calculate the available moves for this piece given the current state of the board."""
         raise NotImplementedError("This method must be implemented in a subclass.")
     
+    # TODO: Fix the check feature by potentially checking each available move into the future and seeing if it results in a check or not.
+
 class King(ChessPiece):
     def calculate_available_moves(self, chessboard: 'ChessBoard'):
         """Calculate the available moves for a King."""
@@ -38,13 +41,26 @@ class King(ChessPiece):
                 new_spot = chessboard.get_piece(new_row, new_col)
                 if new_spot is None or new_spot.color != self.color:  # Destination square is empty or contains an opponent's piece.
                     moves.append((new_row, new_col))
+        
+        # Check for castling moves
+        if self.color == WHITE:
+            if self.row == 7 and self.col == 4:  # Check if the king is in its initial position
+                if chessboard.castling and 'K' in chessboard.castling:  # Check if kingside castling is allowed
+                    if chessboard.get_piece(7, 5) is None and chessboard.get_piece(7, 6) is None:  # Check if the squares between the king and rook are empty
+                        moves.append((7, 6))  # Add kingside castle move
+                if chessboard.castling and 'Q' in chessboard.castling:  # Check if queenside castling is allowed
+                    if chessboard.get_piece(7, 3) is None and chessboard.get_piece(7, 2) is None and chessboard.get_piece(7, 1) is None:  # Check if the squares between the king and rook are empty
+                        moves.append((7, 2))  # Add queenside castle move
+        elif self.color == BLACK:
+            if self.row == 0 and self.col == 4:  # Check if the king is in its initial position
+                if chessboard.castling and 'k' in chessboard.castling:  # Check if kingside castling is allowed
+                    if chessboard.get_piece(0, 5) is None and chessboard.get_piece(0, 6) is None:  # Check if the squares between the king and rook are empty
+                        moves.append((0, 6))  # Add kingside castle move
+                if chessboard.castling and 'q' in chessboard.castling:  # Check if queenside castling is allowed
+                    if chessboard.get_piece(0, 3) is None and chessboard.get_piece(0, 2) is None and chessboard.get_piece(0, 1) is None:  # Check if the squares between the king and rook are empty
+                        moves.append((0, 2))  # Add queenside castle move
+        
         self.available_moves = moves
-        # Can only move to squares that are not under attack by opponent's pieces
-        for move in moves:
-            if move in chessboard.get_available_moves_for_black() and self.color == WHITE:
-                moves.remove(move)
-            elif move in chessboard.get_available_moves_for_white() and self.color == BLACK:
-                moves.remove(move)
 
 class Queen(ChessPiece):
     def calculate_available_moves(self, chessboard: 'ChessBoard'):
@@ -85,7 +101,8 @@ class Rook(ChessPiece):
                     break
                 new_row += dx
                 new_col += dy
-        self.available_moves = moves
+        
+        self.available_moves = moves        
 
 class Bishop(ChessPiece):
     def calculate_available_moves(self, chessboard: 'ChessBoard'):
@@ -148,8 +165,7 @@ class Pawn(ChessPiece):
                     moves.append((new_row, new_col))
                 if (new_row, new_col) == chessboard._get_en_passant():
                     moves.append((new_row, new_col))
-        self.available_moves = moves
-        
+        self.available_moves = moves        
 
 class ChessBoard:
     def __init__(self):
@@ -386,25 +402,7 @@ class ChessBoard:
         self.halfmove_clock = int(fen_parts[4])
         self.fullmove_number = int(fen_parts[5])
         self._calculate_all_available_moves()
-        self._check_check()
-        
-    def _check_check(self):
-        # Handle a check for the validity of the move
-        king_location = self._find_king_location()
-        if self.active_color == WHITE and king_location is not None and king_location in self.get_available_moves_for_black():
-            # print("White king is in check")
-            for row in range(8):
-                for col in range(8):
-                    piece = self.get_piece(row, col)
-                    if piece is not None and not isinstance(piece, King) and piece.get_color() == WHITE:
-                        piece.available_moves = []
-        if self.active_color == BLACK and king_location is not None and king_location in self.get_available_moves_for_white():
-            print("Black king is in check")
-            for row in range(8):
-                for col in range(8):
-                    piece = self.get_piece(row, col)
-                    if piece is not None and not isinstance(piece, King) and piece.get_color() == BLACK:
-                        piece.available_moves = []
+        self.remove_check_moves()
 
     def _calculate_all_available_moves(self):
         for row in range(8):
@@ -412,6 +410,16 @@ class ChessBoard:
                 piece = self.get_piece(row, col)
                 if piece is not None:
                     piece.calculate_available_moves(self)
+    
+    def remove_check_moves(self):
+        for row in range(8):
+            for col in range(8):
+                piece = self.get_piece(row, col)
+                if piece is not None and piece.get_color() == self.active_color:
+                    moves = piece.get_available_moves()
+                    for move in moves[:]:  # The [:] creates a copy of the list
+                        if self.simulate_future_move_check(piece, move):
+                            piece.available_moves.remove(move)
 
     def get_available_moves_for_black(self) -> List[Tuple[int, int]]:
         available_moves = []
@@ -483,3 +491,42 @@ class ChessBoard:
             if row < 7:
                 fen += '/'
         return fen
+
+    def simulate_future_move_check(self, piece: ChessPiece, new_move: Tuple[int, int]) -> bool:
+        """Simulate a future move to check if it results in a check."""
+        # Create a copy of the current board
+        board_copy = copy.deepcopy(self)
+        
+        # Get the current position of the piece
+        current_row, current_col = piece.get_position()
+        
+        # Get the new position of the piece after the move
+        new_row, new_col = new_move
+        
+        # Check if the new position is within the board boundaries
+        if new_row < 0 or new_row >= 8 or new_col < 0 or new_col >= 8:
+            return False
+        
+        # Check if the new position is the same as the current position
+        if new_row == current_row and new_col == current_col:
+            return False
+        
+        # Check if the piece can move to the new position
+        if (new_row, new_col) not in piece.get_available_moves():
+            return False
+        
+        # Check if the new position is occupied by a piece of the same color
+        if board_copy.get_piece(new_row, new_col) is not None and board_copy.get_piece(new_row, new_col).get_color() == piece.get_color():
+            return False
+        
+        # Move the piece from the current position to the new position
+        board_copy._move_piece(current_row, current_col, new_row, new_col)
+        board_copy._calculate_all_available_moves()
+        # Check if the move results in a check
+        king_location = board_copy._find_king_location()
+        if board_copy.active_color == WHITE and king_location is not None and king_location in board_copy.get_available_moves_for_black():
+            return True
+        if board_copy.active_color == BLACK and king_location is not None and king_location in board_copy.get_available_moves_for_white():
+            return True
+        return False
+        
