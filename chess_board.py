@@ -29,8 +29,6 @@ class ChessPiece:
         """Calculate the available moves for this piece given the current state of the board."""
         raise NotImplementedError("This method must be implemented in a subclass.")
     
-    # TODO: Fix the check feature by potentially checking each available move into the future and seeing if it results in a check or not.
-
 class King(ChessPiece):
     def calculate_available_moves(self, chessboard: 'ChessBoard'):
         """Calculate the available moves for a King."""
@@ -40,8 +38,7 @@ class King(ChessPiece):
             if 0 <= new_row < 8 and 0 <= new_col < 8:  # Check that the move is on the board.
                 new_spot = chessboard.get_piece(new_row, new_col)
                 if new_spot is None or new_spot.color != self.color:  # Destination square is empty or contains an opponent's piece.
-                    moves.append((new_row, new_col))
-        
+                    moves.append((new_row, new_col)) 
         # Check for castling moves
         if self.color == WHITE:
             if self.row == 7 and self.col == 4:  # Check if the king is in its initial position
@@ -59,7 +56,6 @@ class King(ChessPiece):
                 if chessboard.castling and 'q' in chessboard.castling:  # Check if queenside castling is allowed
                     if chessboard.get_piece(0, 3) is None and chessboard.get_piece(0, 2) is None and chessboard.get_piece(0, 1) is None:  # Check if the squares between the king and rook are empty
                         moves.append((0, 2))  # Add queenside castle move
-        
         self.available_moves = moves
 
 class Queen(ChessPiece):
@@ -220,12 +216,31 @@ class ChessBoard:
             return
             # raise ValueError("Invalid move: Cannot capture own piece")
 
-        # Check if the move is a castle
-        castle_side = None
-        if isinstance(piece1, King) and isinstance(piece2, Rook):
-            castle_side = self._check_castle_side(piece1, piece2)
-        if castle_side is not None and self.castling is not None:
-            self._handle_castling(castle_side)
+        # Handle castling
+        distance = end_col - start_col
+        if isinstance(piece1, King) and abs(distance) == 2 and (end_row, end_col) in piece1.get_available_moves():
+            if self.active_color == WHITE:
+                if distance > 0:  # Kingside castle
+                    self._move_piece(start_row, start_col, start_row, start_col + 2)
+                    self._move_piece(start_row, start_col + 3, start_row, start_col + 1)
+                else:  # Queenside castle
+                    self._move_piece(start_row, start_col, start_row, start_col - 2)
+                    self._move_piece(start_row, start_col - 4, start_row, start_col - 1)
+                if "K" in self.castling:
+                    self.castling = self.castling.replace("K", "")
+                if "Q" in self.castling:
+                    self.castling = self.castling.replace("Q", "")
+            else:  # BLACK
+                if distance > 0:  # Kingside castle
+                    self._move_piece(start_row, start_col, start_row, start_col + 2)
+                    self._move_piece(start_row, start_col + 3, start_row, start_col + 1)
+                else:  # Queenside castle
+                    self._move_piece(start_row, start_col, start_row, start_col - 2)
+                    self._move_piece(start_row, start_col - 4, start_row, start_col - 1)
+                if "k" in self.castling:
+                    self.castling = self.castling.replace("k", "")
+                if "q" in self.castling:
+                    self.castling = self.castling.replace("q", "")
             self.en_passant = None
             self._update_half_full_moves()
             self._update_active_color()
@@ -251,10 +266,35 @@ class ChessBoard:
         if (end_row, end_col) not in piece1.get_available_moves():
             print("Invalid move: Piece cannot move to that position")
             return
-            # raise ValueError("Invalid move: Piece cannot move to that position")
 
         # Move the piece
         self._move_piece(start_row, start_col, end_row, end_col)
+
+        # Check if the move was a king move to remove castling options
+        if isinstance(piece1, King):
+            if self.active_color == WHITE:
+                if "K" in self.castling:
+                    self.castling = self.castling.replace("K", "")
+                if "Q" in self.castling:
+                    self.castling = self.castling.replace("Q", "")
+            else:
+                if "k" in self.castling:
+                    self.castling = self.castling.replace("k", "")
+                if "q" in self.castling:
+                    self.castling = self.castling.replace("q", "")
+
+        # Check if the move was a rook move to remove castling options
+        if isinstance(piece1, Rook):
+            if self.active_color == WHITE:
+                if start_row == 7 and start_col == 0 and "Q" in self.castling:
+                    self.castling = self.castling.replace("Q", "")
+                if start_row == 7 and start_col == 7 and "K" in self.castling:
+                    self.castling = self.castling.replace("K", "")
+            else:
+                if start_row == 0 and start_col == 0 and "q" in self.castling:
+                    self.castling = self.castling.replace("q", "")
+                if start_row == 0 and start_col == 7 and "k" in self.castling:
+                    self.castling = self.castling.replace("k", "")
         
         # Check if the move is a pawn promotion
         if isinstance(piece1, Pawn) and (end_row == 0 or end_row == 7):
@@ -286,80 +326,6 @@ class ChessBoard:
         self.halfmove_clock += 1
         if self.active_color == BLACK:
             self.fullmove_number += 1
-
-    def _check_castle_side(self, piece1: ChessPiece, piece2: ChessPiece) -> str:
-        active_color = self._get_active_color()
-        if not piece1.color == active_color or not piece2.color == active_color:
-            return None
-        if active_color == WHITE:
-            if piece2.col > piece1.col and self.castling.find("K") != -1:
-                return "kingside"
-            elif piece2.col < piece1.col and self.castling.find("Q") != -1:
-                return "queenside"
-        if active_color == BLACK:
-            if piece2.col > piece1.col and self.castling.find("k") != -1:
-                return "kingside"
-            elif piece2.col < piece1.col and self.castling.find("q") != -1:
-                return "queenside"
-        return None
-
-    def _handle_castling(self, side: str):
-        if self.active_color == WHITE:
-            king_row = 7
-        else:
-            king_row = 0
-
-        if side == "kingside":
-            rook_col = 7
-            new_king_col = 6
-            new_rook_col = 5
-        elif side == "queenside":
-            rook_col = 0
-            new_king_col = 2
-            new_rook_col = 3
-        else:
-            raise ValueError("Invalid castle side")
-
-        king = self.get_piece(king_row, 4)
-        rook = self.get_piece(king_row, rook_col)
-
-        if not isinstance(king, King) or not isinstance(rook, Rook):
-            raise ValueError("Invalid castle move")
-
-        if king.get_color() != self.active_color or rook.get_color() != self.active_color:
-            raise ValueError("Invalid castle move")
-
-        if king.get_position() != (king_row, 4) or rook.get_position() != (king_row, rook_col):
-            raise ValueError("Invalid castle move")
-
-        # Check if there are any pieces between the king and rook
-        # TODO: Check if the king is in check, moves through check, or ends in check
-        if rook_col == 7:
-            for col in range(5, 7):
-                if self.get_piece(king_row, col) is not None:
-                    raise ValueError("Invalid castle move")
-        else:
-            for col in range(1, 4):
-                if self.get_piece(king_row, col) is not None:
-                    raise ValueError("Invalid castle move")
-
-        # Update the board
-        self._move_piece(king_row, 4, king_row, new_king_col)
-        self._move_piece(king_row, rook_col, king_row, new_rook_col)
-
-        # Update the fen string
-        if side == "kingside":
-            if self.active_color == WHITE:
-                self.castling = self.castling.replace("K", "")
-            else:  # BLACK
-                self.castling = self.castling.replace("k", "")
-        elif side == "queenside":
-            if self.active_color == WHITE:
-                self.castling = self.castling.replace("Q", "")
-            else:  # BLACK
-                self.castling = self.castling.replace("q", "")
-        if self.castling == "":
-            self.castling = None
 
     def _place_pieces_from_fen(self, fen: str):
         rows = fen.split('/')
@@ -410,7 +376,7 @@ class ChessBoard:
                 piece = self.get_piece(row, col)
                 if piece is not None:
                     piece.calculate_available_moves(self)
-    
+
     def remove_check_moves(self):
         for row in range(8):
             for col in range(8):
@@ -418,6 +384,18 @@ class ChessBoard:
                 if piece is not None and piece.get_color() == self.active_color:
                     moves = piece.get_available_moves()
                     for move in moves[:]:  # The [:] creates a copy of the list
+                        # Check if a castling move results in a check in transition
+                        distance = move[1] - piece.get_position()[1]
+                        if isinstance(piece, King) and abs(distance) == 2: # Castling move
+                            if distance < 0: # Queenside castling
+                                print("Queenside castling")
+                                if self.simulate_future_move_check(piece, (row, col - 1)):
+                                    piece.available_moves.remove(move)
+                                    print("KING IN-TRANSITION CHECK")
+                            elif distance > 0: # Kingside castling
+                                if self.simulate_future_move_check(piece, (row, col + 1)):
+                                    piece.available_moves.remove(move)
+                        # For all other moves
                         if self.simulate_future_move_check(piece, move):
                             piece.available_moves.remove(move)
 
@@ -511,9 +489,7 @@ class ChessBoard:
         if new_row == current_row and new_col == current_col:
             return False
         
-        # Check if the piece can move to the new position
-        if (new_row, new_col) not in piece.get_available_moves():
-            return False
+        # Note: we already check if the move is in the available moves in the main function
         
         # Check if the new position is occupied by a piece of the same color
         if board_copy.get_piece(new_row, new_col) is not None and board_copy.get_piece(new_row, new_col).get_color() == piece.get_color():
