@@ -78,7 +78,6 @@ class Queen(ChessPiece):
                 new_col += dy
         self.available_moves = moves
 
-
 class Rook(ChessPiece):
     def calculate_available_moves(self, chessboard: 'ChessBoard'):
         """Calculate the available moves for a Rook."""
@@ -248,7 +247,7 @@ class ChessBoard:
 
         # Check if the move is an en passant
         if isinstance(piece1, Pawn) and self.en_passant == (end_row, end_col) and self.en_passant in piece1.get_available_moves():
-            print("ENTERED: en passant move")
+            # print("ENTERED: en passant move")
             self._move_piece(start_row, start_col, end_row, end_col)
             pawn = None
             if self.active_color == WHITE:
@@ -305,14 +304,14 @@ class ChessBoard:
         if isinstance(piece1, Pawn) and abs(start_row - end_row) == 2:
             if self.active_color == WHITE:
                 self.en_passant = (end_row + 1, end_col)
-                print("white en passant set")
+                # print("white en passant set")
             else:
                 self.en_passant = (end_row - 1, end_col)
-                print("black en passant set")
+                # print("black en passant set")
             # self.en_passant = (end_row, end_col)
         else:
             self.en_passant = None
-        print("en passant after move at: " + str(self.en_passant))
+        # print("en passant after move at: " + str(self.en_passant))
         self._update_half_full_moves()
         self._update_active_color()
 
@@ -388,10 +387,8 @@ class ChessBoard:
                         distance = move[1] - piece.get_position()[1]
                         if isinstance(piece, King) and abs(distance) == 2: # Castling move
                             if distance < 0: # Queenside castling
-                                print("Queenside castling")
                                 if self.simulate_future_move_check(piece, (row, col - 1)):
                                     piece.available_moves.remove(move)
-                                    print("KING IN-TRANSITION CHECK")
                             elif distance > 0: # Kingside castling
                                 if self.simulate_future_move_check(piece, (row, col + 1)):
                                     piece.available_moves.remove(move)
@@ -420,6 +417,28 @@ class ChessBoard:
                     for move in moves:
                         available_moves.append(move)
         return available_moves
+
+    def black_pieces_with_available_moves(self) -> List[ChessPiece]:
+        pieces = []
+        for row in range(8):
+            for col in range(8):
+                piece = self.get_piece(row, col)
+                if piece is not None and piece.get_color() == BLACK:
+                    moves = piece.get_available_moves()
+                    if moves:
+                        pieces.append(piece)
+        return pieces
+
+    def white_pieces_with_available_moves(self) -> Dict[Tuple[int, int], List[Tuple[int, int]]]:
+        pieces = {}
+        for row in range(8):
+            for col in range(8):
+                piece = self.get_piece(row, col)
+                if piece is not None and piece.get_color() == WHITE:
+                    moves = piece.get_available_moves()
+                    if moves:
+                        pieces[(row, col)] = moves
+        return pieces
 
     def get_fen_string(self) -> str:
         fen = self._get_board_fen_string()

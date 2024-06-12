@@ -1,6 +1,7 @@
 import pygame
 import sys
 import chess_board
+import random
 
 # Initialize Pygame
 pygame.init()
@@ -24,8 +25,6 @@ for row in range(8):
         else:
             pygame.draw.rect(board, gray_color, (col * square_size, row * square_size, square_size, square_size))
 
-# Initial positions (0-based indices for rows and columns)
-rook_position = (1, 0)
 
 def draw_pieces(fen_string: str):
     # Mapping of FEN characters to image paths
@@ -92,74 +91,55 @@ def clear_green_squares():
             else:
                 pygame.draw.rect(board, gray_color, (col * square_size, row * square_size, square_size, square_size))
 
-# Variables to handle the two-click movement
-selected_piece = None
-selected_position = None
-
-# Main loop
+# Initial setup
 fen_string = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
 chessboard = chess_board.ChessBoard()
-# Initial setup
 chessboard.process_fen_string(fen_string)
 draw_pieces(fen_string)
-pygame.display.flip()
-
+selected_piece = None
 running = True
-while running:
+while running: # Main game loop
     for event in pygame.event.get():
-        # print(f"FEN String: {fen_string}")
         if event.type == pygame.QUIT:
             running = False
-        elif event.type == pygame.MOUSEBUTTONDOWN:
+        elif event.type == pygame.MOUSEBUTTONDOWN and chessboard.active_color == 'w':
             mouse_x, mouse_y = event.pos
             clicked_row = mouse_y // square_size
             clicked_col = mouse_x // square_size
-
-            null_piece = chessboard.get_piece(clicked_row, clicked_col)
-            # Check for clicking on a piece that is not a valid move
-            if selected_piece is not None and null_piece is not None and (clicked_row, clicked_col) not in selected_piece.get_available_moves() and null_piece.color == chessboard.active_color:
-                print("Switch piece selection")
+            null_piece = chessboard.get_piece(clicked_row, clicked_col) # Unknown piece of clicked position
+            if selected_piece is not None and null_piece is not None and (clicked_row, clicked_col) not in \
+                selected_piece.get_available_moves() and null_piece.color == chessboard.active_color: # Switch piece selection
                 selected_piece = null_piece
-                selected_position = (clicked_row, clicked_col)
                 clear_green_squares()
-                available_moves = selected_piece.get_available_moves()
-                place_green_squares(available_moves)
+                place_green_squares(selected_piece.get_available_moves())
                 draw_pieces(fen_string)
-                pygame.display.flip()
-                continue
-            elif selected_piece is not None and (clicked_row, clicked_col) not in selected_piece.get_available_moves():
-                print("Attempting to move to a non-valid square")
+            elif selected_piece is not None and (clicked_row, clicked_col) not in selected_piece.get_available_moves(): # Second click on a non-valid square
                 selected_piece = None
-                selected_position = None
                 clear_green_squares()
                 draw_pieces(fen_string)
-                pygame.display.flip()
-                continue
-
             if selected_piece is None: # First click
-                print("First click")
-                piece = null_piece
-                if piece is not None and piece.color == chessboard.active_color:
-                    selected_piece = piece
-                    selected_position = (clicked_row, clicked_col)
-                    available_moves = selected_piece.get_available_moves()
-                    place_green_squares(available_moves)
+                if null_piece is not None and null_piece.color == chessboard.active_color:
+                    selected_piece = null_piece
+                    place_green_squares(selected_piece.get_available_moves())
                     draw_pieces(fen_string)
-                    pygame.display.flip()
-                    continue
                 else:
                     continue
             else: # Second click (selected_piece is not None and in available_moves)
-                print("Second click")
                 clear_green_squares()
-                chessboard.handle_moves(selected_position[0], selected_position[1], clicked_row, clicked_col)
+                position = selected_piece.get_position()
+                chessboard.handle_moves(position[0], position[1], clicked_row, clicked_col)
                 fen_string = chessboard.get_fen_string()
                 chessboard.process_fen_string(fen_string)
                 draw_pieces(fen_string)
-                # print(f"FEN String: {fen_string}")
                 selected_piece = None
-                selected_position = None
-                pygame.display.flip()
-
+        elif chessboard.active_color == 'b': # AI move
+            movables = chessboard.black_pieces_with_available_moves()
+            if movables:
+                piece = random.choice(movables)
+                move = random.choice(piece.get_available_moves())
+                chessboard.handle_moves(piece.get_position()[0], piece.get_position()[1], move[0], move[1])
+                fen_string = chessboard.get_fen_string()
+                chessboard.process_fen_string(fen_string)
+                draw_pieces(fen_string)
 pygame.quit()
 sys.exit()
